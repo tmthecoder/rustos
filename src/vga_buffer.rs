@@ -126,7 +126,10 @@ impl Writer {
     }
 }
 
-use core::fmt; // Allows access to the fmt::Write trait
+use core::fmt;
+use core::fmt::Write;
+
+// Allows access to the fmt::Write trait
 // Implement write! format macros for the Writer struct
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -142,10 +145,30 @@ use spin::Mutex;
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
-        color_code: ColorCode::new(Color::Blue, Color::Black),
+        color_code: ColorCode::new(Color::LightBlue, Color::Black),
         // The location of the vga buffer: 0xb8000
         // VGA Buffer article: https://os.phil-opp.com/vga-text-mode/
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
 
+#[doc(hidden)]
+// The method to actually send the formatted string to the VGA buffer from 'print!'
+pub fn _print(args: fmt::Arguments) {
+    WRITER.lock().write_fmt(args).unwrap();
+}
+
+// Add support for the 'print!' macro
+// Writes the sent formatted string to the VGA buffer
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
+
+// Add support for the 'println!' macro
+// Writes the sent formatted string to the VGA buffer appended by a newline
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}
