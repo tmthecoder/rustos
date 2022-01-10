@@ -9,7 +9,6 @@ mod vga_buffer;
 #[no_mangle] // Don't mangle this as it's the entrypoint
 pub extern "C" fn _start() -> ! {
     println!("Hello World{}", "!");
-    panic!("some panic message");
     loop{}
 }
 
