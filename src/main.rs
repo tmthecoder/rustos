@@ -1,5 +1,8 @@
 #![no_std]
 #![no_main]
+#![feature(custom_test_frameworks)]
+#![test_runner(crate::test_runner)]
+#![reexport_test_harness_main = "test_main"] // Rename the generated test 'main' function
 
 use core::panic::PanicInfo;
 
@@ -9,6 +12,10 @@ mod vga_buffer;
 #[no_mangle] // Don't mangle this as it's the entrypoint
 pub extern "C" fn _start() -> ! {
     println!("Hello World{}", "!");
+
+    #[cfg(test)]
+    test_main(); // Call that renamed function on testing configs
+
     loop{}
 }
 
@@ -17,4 +24,43 @@ pub extern "C" fn _start() -> ! {
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
     loop {}
+}
+
+
+// Main test runner (needed for manual test config)
+// '&[&dyn Fn()] - Slice of items that implement the 'Fn()' trait (basically a list of references to functions)
+#[cfg(test)]
+fn test_runner(tests: &[&dyn Fn()]) {
+    println!("Running {} tests", tests.len());
+    // Run each test
+    for test in tests {
+        test();
+    }
+    // Exit with a successful code as all tests passed
+    exit_qemu(QemuExitCode::Success);
+}
+
+#[test_case]
+// A trivial test to check passing
+fn trivial_assertion() {
+    print!("trivial assertion... ");
+    assert_eq!(1, 1);
+    println!("[ok]")
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)] // Represented as a u32
+pub enum QemuExitCode {
+    Success = 0x10,
+    Failed = 0x11,
+}
+
+// A method to exit qemu, uses the x86_64 crate to write an exit code to the 0xf4 port and shutdown the emulator
+pub fn exit_qemu(exit_code: QemuExitCode) {
+    use x86_64::instructions::port::Port;
+
+    unsafe {
+        let mut port = Port::new(0xf4);
+        port.write(exit_code as u32)
+    }
 }
