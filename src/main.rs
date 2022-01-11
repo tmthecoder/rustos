@@ -69,7 +69,7 @@ impl<T> Testable for T where T: Fn() {
         serial_print!("{}...\t", core::any::type_name::<T>());
         self();
         // Test passed at this point, so print 'ok'
-        serial_println!("[ok");
+        serial_println!("[ok]");
     }
 }
 
