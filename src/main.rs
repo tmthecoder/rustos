@@ -14,7 +14,12 @@ pub extern "C" fn _start() -> ! {
 
     rustos::init();
 
-    x86_64::instructions::interrupts::int3();
+    fn stack_overflow() {
+        stack_overflow(); // for each recursion, the return address is pushed
+    }
+
+    // trigger a stack overflow
+    stack_overflow();
 
     #[cfg(test)]
     test_main(); // Call that renamed function on testing configs

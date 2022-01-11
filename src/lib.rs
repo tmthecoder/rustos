@@ -9,6 +9,7 @@ use core::panic::PanicInfo;
 pub mod serial;
 pub mod vga_buffer;
 pub mod interrupts;
+pub mod gdt;
 
 // Create a trait for all test functions
 pub trait Testable {
@@ -55,6 +56,7 @@ pub extern "C" fn _start() -> ! {
 }
 
 pub fn init() {
+    gdt::init();
     interrupts::init_idt();
 }
 
