@@ -172,3 +172,28 @@ macro_rules! println {
     () => ($crate::print!("\n"));
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
+
+// Test that a simple one-line print works
+#[test_case]
+fn test_println_simple() {
+    println!("test_println_simple output")
+}
+
+// Test that a multi-line print works (lots of lines)
+#[test_case]
+fn test_println_many() {
+    for _ in 0..200 {
+        println!("test_println_many output");
+    }
+}
+
+// Test that a test string actually matches it's supposed value in the VGA buffer
+#[test_case]
+fn test_println_output() {
+    let s = "Some test string";
+    println!("{}", s);
+    for (i, c) in s.chars().enumerate() {
+        let screen_char = WRITER.lock().buffer.chars[BUFFER_WIDTH-2][i].read();
+        assert_eq!(char::from(screen_char.ascii_character), c);
+    }
+}

@@ -7,6 +7,7 @@
 use core::panic::PanicInfo;
 
 mod vga_buffer;
+mod serial;
 
 // Entry function as the linker looks for '_start()' by default
 #[no_mangle] // Don't mangle this as it's the entrypoint
@@ -20,21 +21,31 @@ pub extern "C" fn _start() -> ! {
 }
 
 // Called on panic
+#[cfg(not(test))]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
     loop {}
 }
 
+// A panic handler called solely when testing (exits and prints to serial)
+#[cfg(test)]
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    serial_println!("[failed]\n");
+    serial_println!("Error: {}\n", info);
+    exit_qemu(QemuExitCode::Failed);
+    loop {}
+}
 
 // Main test runner (needed for manual test config)
 // '&[&dyn Fn()] - Slice of items that implement the 'Fn()' trait (basically a list of references to functions)
 #[cfg(test)]
-fn test_runner(tests: &[&dyn Fn()]) {
-    println!("Running {} tests", tests.len());
+fn test_runner(tests: &[&dyn Testable]) {
+    serial_println!("Running {} tests", tests.len());
     // Run each test
     for test in tests {
-        test();
+        test.run();
     }
     // Exit with a successful code as all tests passed
     exit_qemu(QemuExitCode::Success);
@@ -43,9 +54,23 @@ fn test_runner(tests: &[&dyn Fn()]) {
 #[test_case]
 // A trivial test to check passing
 fn trivial_assertion() {
-    print!("trivial assertion... ");
     assert_eq!(1, 1);
-    println!("[ok]")
+}
+
+// Create a trait for all test functions
+pub trait Testable {
+    fn run(&self) -> ();
+}
+
+// Make all existing Functions conform to the Testable traut
+impl<T> Testable for T where T: Fn() {
+    fn run(&self) {
+        // Print the function name to the console
+        serial_print!("{}...\t", core::any::type_name::<T>());
+        self();
+        // Test passed at this point, so print 'ok'
+        serial_println!("[ok");
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
