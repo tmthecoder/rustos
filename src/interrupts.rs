@@ -1,4 +1,5 @@
 use lazy_static::lazy_static;
+use pc_keyboard::ScancodeSet1;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 use spin;
 use pic8259::ChainedPics;
@@ -24,6 +25,8 @@ lazy_static! {
         }
         // Set the timer handler (From the PIC)
         idt[InterruptIndex::Timer.as_usize()].set_handler_fn(timer_interrupt_handler);
+        // Set the keyboard handler (From the PIC)
+        idt[InterruptIndex::Keyboard.as_usize()].set_handler_fn(keyboard_interrupt_handler);
         idt
     };
 }
@@ -33,6 +36,7 @@ lazy_static! {
 #[repr(u8)]
 pub enum InterruptIndex {
     Timer = PIC_1_OFFSET,
+    Keyboard, // Defaults to Timer + 1
 }
 
 // Functions for easy numeric access to each interrupt index
@@ -69,6 +73,53 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
     unsafe {
         PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
     }
+}
+
+extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    use x86_64::instructions::port::Port;
+    use spin::Mutex;
+    use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet};
+
+    lazy_static! {
+        static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> = Mutex::new(
+            Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore)
+        );
+    }
+
+    let mut keyboard = KEYBOARD.lock();
+    let mut port = Port::new(0x60);
+    let scancode: u8 = unsafe { port.read() };
+
+    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+        if let Some(key) = keyboard.process_keyevent(key_event) {
+            match key {
+                DecodedKey::Unicode(character) => print!("{}", character),
+                DecodedKey::RawKey(key) => print!("{:?}", key),
+            }
+        }
+    }
+
+    unsafe {
+        PICS.lock().notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
+    }
+
+    // Number mappings on the keyboard (commended in favor of the 'pc-keyboard' crate)
+    // let key = match scancode {
+    //     0x02 => Some('1'),
+    //     0x03 => Some('2'),
+    //     0x04 => Some('3'),
+    //     0x05 => Some('4'),
+    //     0x06 => Some('5'),
+    //     0x07 => Some('6'),
+    //     0x08 => Some('7'),
+    //     0x09 => Some('8'),
+    //     0x0a => Some('9'),
+    //     0x0b => Some('0'),
+    //     _ => None,
+    // };
+    // if let Some(key) = key {
+    //     print!("{}", key);
+    // }
 }
 
 #[test_case]
