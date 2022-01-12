@@ -17,7 +17,11 @@ lazy_static!{
 // Print to the serial console (host os console)
 pub fn _print(args: ::core::fmt::Arguments) {
     use core::fmt::Write;
-    SERIAL1.lock().write_fmt(args).expect("Printing to serial failed");
+    use x86_64::instructions::interrupts;
+
+    interrupts::without_interrupts(|| {
+        SERIAL1.lock().write_fmt(args).expect("Printing to serial failed");
+    });
 }
 
 // Actual macro to print to the serial console with formatted strings

@@ -155,7 +155,11 @@ lazy_static! {
 #[doc(hidden)]
 // The method to actually send the formatted string to the VGA buffer from 'print!'
 pub fn _print(args: fmt::Arguments) {
-    WRITER.lock().write_fmt(args).unwrap();
+    use x86_64::instructions::interrupts;
+
+    interrupts::without_interrupts(|| {
+        WRITER.lock().write_fmt(args).unwrap();
+    });
 }
 
 // Add support for the 'print!' macro
@@ -190,10 +194,18 @@ fn test_println_many() {
 // Test that a test string actually matches it's supposed value in the VGA buffer
 #[test_case]
 fn test_println_output() {
+    use x86_64::instructions::interrupts;
     let s = "Some test string";
-    println!("{}", s);
-    for (i, c) in s.chars().enumerate() {
-        let screen_char = WRITER.lock().buffer.chars[BUFFER_HEIGHT-2][i].read();
-        assert_eq!(char::from(screen_char.ascii_character), c);
-    }
+    // Run without interrupts so nothing else is printed
+    interrupts::without_interrupts(|| {
+        // Lock the writer and get mutable access
+       let mut writer = WRITER.lock();
+        // Write to the writer
+        writeln!(writer, "\n{}", s).expect("writeln failed");
+        for (i, c) in s.chars().enumerate() {
+            // Verify each character
+            let screen_char = writer.buffer.chars[BUFFER_HEIGHT-2][i].read();
+            assert_eq!(char::from(screen_char.ascii_character), c);
+        }
+    });
 }

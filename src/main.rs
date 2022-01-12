@@ -19,7 +19,7 @@ pub extern "C" fn _start() -> ! {
 
     println!("No Crashes!");
 
-    loop{}
+    rustos::hlt_loop();
 }
 
 // Called on panic
@@ -27,7 +27,7 @@ pub extern "C" fn _start() -> ! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
-    loop {}
+    rustos::hlt_loop();
 }
 
 // Panic called when testing
