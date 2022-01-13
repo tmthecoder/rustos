@@ -6,21 +6,22 @@
 
 use core::panic::PanicInfo;
 use bootloader::{BootInfo, entry_point};
-use rustos::memory::translate_addr;
-use rustos::println;
+use x86_64::structures::paging::Translate;
+use rustos::{memory, println};
 
 // The bootloader package's provided macro to set the entry point of the OS
 entry_point!(kernel_main);
 
 // Rust type-checked entry function with the 'boot_info' parameter
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    use rustos::memory::active_level_4_table;
     use x86_64::VirtAddr;
 
     println!("Hello World{}", "!");
     rustos::init();
 
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mapper = unsafe { memory::init(phys_mem_offset) };
+
 
     let addresses = [
         // the identity-mapped vga buffer page
@@ -35,7 +36,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     for &address in &addresses {
         let virt = VirtAddr::new(address);
-        let phys = unsafe { translate_addr(virt, phys_mem_offset) };
+        let phys = mapper.translate_addr(virt);
         println!("{:?} -> {:?}", virt, phys);
     }
 
